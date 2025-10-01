@@ -1,4 +1,5 @@
 from django.shortcuts import render
+from .permissions import IsClubHeadOrReadOnly
 
 # Create your views here.
 
@@ -20,7 +21,27 @@ class ClubtypeViewset(viewsets.ModelViewSet):
     
 class Eventviewset(viewsets.ModelViewSet):
     queryset=Event.objects.all()
-    serializers_class=EventSerialzer
+    serializer_class=EventSerialzer
+    permission_classes = [IsAuthenticated , IsClubHeadOrReadOnly]
+
+    @action(detail=False, methods=["get"])
+    def events(self,request , pk=None):
+        club=self.get_object()
+        events=Event.objects.filter(organised_by=club,date__gte=timezone)
+        serializer =EventSerialzer(events,many =True)
+        return Response(serializer.data)
+    def get_queryset(self):
+        user = self.request.user
+        if user.role == "Club Head":
+            return Event.objects.filter(organised_by=user.club)
+        return Event.objects.all()
+    def perform_create(self, serializer):
+        user = self.request.user
+        if user.role == "Club Head":
+            serializer.save(organised_by=user.club)
+        else:
+            serializer.save()
+
 
 class MembershipViewset(viewsets.ModelViewSet):
     queryset=Membership.objects.all()
@@ -29,4 +50,4 @@ class MembershipViewset(viewsets.ModelViewSet):
 class AnnouncemntsViewset(viewsets.ModelViewSet):
     queryset=Announcements.objects.all()
     serializer_class=AnnouncementsSerializers
-        
+
